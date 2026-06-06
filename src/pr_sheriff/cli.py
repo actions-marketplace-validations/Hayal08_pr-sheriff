@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 
 from .core import DEFAULT_CONFIG, analyze, git_changes, load_config
+from .github import pull_request_number, upsert_pull_request_comment
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -21,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--github-summary", type=Path, help=argparse.SUPPRESS)
     check.add_argument("--github-output", type=Path, help=argparse.SUPPRESS)
     check.add_argument("--github-annotations", action="store_true", help=argparse.SUPPRESS)
+    check.add_argument("--github-comment", action="store_true", help=argparse.SUPPRESS)
     init = subparsers.add_parser("init", help="write a starter configuration")
     init.add_argument("--config", default=".pr-sheriff.json", type=Path)
     return parser
@@ -113,6 +116,25 @@ def main(argv: list[str] | None = None) -> int:
         write_github_output(args.github_output, report)
     if args.github_annotations:
         print_github_annotations(report)
+    if args.github_comment:
+        try:
+            event_path = os.environ.get("GITHUB_EVENT_PATH")
+            repository = os.environ.get("GITHUB_REPOSITORY")
+            token = os.environ.get("GITHUB_TOKEN")
+            api_url = os.environ.get("GITHUB_API_URL", "https://api.github.com")
+            if event_path and repository and token:
+                number = pull_request_number(Path(event_path))
+                if number:
+                    result = upsert_pull_request_comment(
+                        markdown_report(report), token, repository, number, api_url
+                    )
+                    print(f"PR comment {result}.")
+                else:
+                    print("PR comment skipped: workflow event is not a pull request.")
+            else:
+                print("PR comment skipped: GitHub environment is incomplete.")
+        except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
+            print(f"::warning::PR comment skipped: {github_escape(str(exc))}")
     return 1 if report.violations else 0
 
 

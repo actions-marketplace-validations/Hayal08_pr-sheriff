@@ -5,7 +5,12 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from pr_sheriff.cli import github_escape, markdown_report, print_github_annotations, write_github_output
+from pr_sheriff.cli import (
+    github_escape,
+    markdown_report,
+    print_github_annotations,
+    write_github_output,
+)
 from pr_sheriff.cli import main
 from pr_sheriff.core import DEFAULT_CONFIG, Report, load_config
 

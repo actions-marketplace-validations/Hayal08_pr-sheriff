@@ -53,6 +53,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   review-risk:
@@ -61,13 +62,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: Hayal08/pr-sheriff@v0.2.0
+      - uses: Hayal08/pr-sheriff@v0.3.0
         with:
           base: origin/${{ github.base_ref }}
 ```
 
 The Action adds a report to the GitHub Job Summary, emits annotations for
-sensitive files and policy violations, and fails when policy is violated.
+sensitive files and policy violations, creates or updates one pull request
+comment, and fails when policy is violated.
 
 ### Action inputs
 
@@ -76,6 +78,7 @@ sensitive files and policy violations, and fails when policy is violated.
 | `base` | `origin/main` | Base git ref for the three-dot diff |
 | `head` | `HEAD` | Head git ref for the three-dot diff |
 | `config` | `.pr-sheriff.json` | Path to repository policy |
+| `comment` | `true` | Create or update a report comment on pull requests |
 
 The Action exposes `risk`, `score`, `changed-files`, `changed-lines`, and
 `tests-changed` outputs for later workflow steps.
@@ -97,6 +100,16 @@ Run `pr-sheriff init` or add `.pr-sheriff.json` manually:
 
 Unknown configuration keys are rejected so typos cannot silently weaken a
 policy.
+
+## Try it safely
+
+Open a pull request that changes more than `require_tests_after_lines` without
+changing a test file. PR Sheriff will add a policy violation to its single
+updatable PR comment and fail the check. Add a test file and push again to see
+the same comment update and the check pass.
+
+For pull requests from forks, GitHub may provide a read-only token. In that
+case, PR Sheriff still runs but reports that it could not update the comment.
 
 ## Philosophy
 
