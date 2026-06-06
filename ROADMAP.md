@@ -13,16 +13,19 @@ review. The roadmap is intentionally small and driven by maintainer feedback.
 ## Next: better policy checks
 
 - Require changelog entries for user-visible changes.
-- Support path-specific thresholds and policies.
 - Detect dependency and public API changes.
+
+Recently completed:
+
+- Support path-specific thresholds and policies.
 - Explain how each part of the risk score was calculated.
+- Add a non-blocking advisory mode for gradual adoption.
 
 ## Later: larger repositories
 
 - Add first-class monorepo support.
 - Report risk separately for affected packages.
 - Support reusable organization-wide policy presets.
-- Explore a non-blocking advisory mode for gradual adoption.
 
 ## Not planned
 

@@ -20,6 +20,9 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--head", default="HEAD", help="head git ref")
     check.add_argument("--config", default=".pr-sheriff.json", type=Path)
     check.add_argument("--json", action="store_true", dest="as_json")
+    check.add_argument(
+        "--advisory", action="store_true", help="report violations without failing"
+    )
     check.add_argument("--github-summary", type=Path, help=argparse.SUPPRESS)
     check.add_argument("--github-output", type=Path, help=argparse.SUPPRESS)
     check.add_argument("--github-annotations", action="store_true", help=argparse.SUPPRESS)
@@ -32,6 +35,13 @@ def build_parser() -> argparse.ArgumentParser:
 def print_report(report) -> None:
     print(f"PR risk: {report.risk.upper()} ({report.score}/100)")
     print(f"Changed: {report.changed_files} files, {report.changed_lines} lines")
+    if report.score_breakdown:
+        print(
+            "Score: "
+            f"lines +{report.score_breakdown['changed_lines']}, "
+            f"files +{report.score_breakdown['changed_files']}, "
+            f"sensitive +{report.score_breakdown['sensitive_files']}"
+        )
     if report.sensitive_files:
         print("Sensitive files:")
         for path in report.sensitive_files:
@@ -44,8 +54,8 @@ def print_report(report) -> None:
         print("Policy check passed.")
 
 
-def markdown_report(report) -> str:
-    status = "Failed" if report.violations else "Passed"
+def markdown_report(report, advisory: bool = False) -> str:
+    status = "Advisory" if advisory and report.violations else "Failed" if report.violations else "Passed"
     tests = "yes" if report.tests_changed else "no"
     lines = [
         "## PR Sheriff report",
@@ -56,6 +66,31 @@ def markdown_report(report) -> str:
         "| ---: | ---: | :---: |",
         f"| {report.changed_files} | {report.changed_lines} | {tests} |",
     ]
+    if report.score_breakdown:
+        breakdown = report.score_breakdown
+        lines.extend(
+            [
+                "",
+                "<details>",
+                "<summary>Risk score breakdown</summary>",
+                "",
+                "| Changed lines | Changed files | Sensitive files | Cap adjustment | Total |",
+                "| ---: | ---: | ---: | ---: | ---: |",
+                f"| +{breakdown['changed_lines']} | +{breakdown['changed_files']} | "
+                f"+{breakdown['sensitive_files']} | {breakdown['cap_adjustment']} | "
+                f"**{breakdown['total']}** |",
+                "",
+                "</details>",
+            ]
+        )
+    if report.path_rule_results:
+        lines.extend(["", "### Matched path rules"])
+        for result in report.path_rule_results:
+            status_text = "violated" if result["violations"] else "passed"
+            lines.append(
+                f"- **{result['name']}**: {result['changed_files']} files, "
+                f"{result['changed_lines']} lines ({status_text})"
+            )
     if report.sensitive_files:
         lines.extend(["", "### Sensitive files"])
         lines.extend(f"- `{path}`" for path in report.sensitive_files)
@@ -76,17 +111,19 @@ def write_github_output(path: Path, report) -> None:
         "changed-files": report.changed_files,
         "changed-lines": report.changed_lines,
         "tests-changed": str(report.tests_changed).lower(),
+        "policy-passed": str(not report.violations).lower(),
     }
     with path.open("a", encoding="utf-8") as output:
         for key, value in values.items():
             output.write(f"{key}={value}\n")
 
 
-def print_github_annotations(report) -> None:
+def print_github_annotations(report, advisory: bool = False) -> None:
     for path in report.sensitive_files:
         print(f"::warning file={github_escape(path)}::Sensitive file changed")
     for violation in report.violations:
-        print(f"::error::{github_escape(violation)}")
+        level = "warning" if advisory else "error"
+        print(f"::{level}::{github_escape(violation)}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -111,11 +148,11 @@ def main(argv: list[str] | None = None) -> int:
         print_report(report)
     if args.github_summary:
         with args.github_summary.open("a", encoding="utf-8") as summary:
-            summary.write(markdown_report(report))
+            summary.write(markdown_report(report, args.advisory))
     if args.github_output:
         write_github_output(args.github_output, report)
     if args.github_annotations:
-        print_github_annotations(report)
+        print_github_annotations(report, args.advisory)
     if args.github_comment:
         try:
             event_path = os.environ.get("GITHUB_EVENT_PATH")
@@ -126,7 +163,11 @@ def main(argv: list[str] | None = None) -> int:
                 number = pull_request_number(Path(event_path))
                 if number:
                     result = upsert_pull_request_comment(
-                        markdown_report(report), token, repository, number, api_url
+                        markdown_report(report, args.advisory),
+                        token,
+                        repository,
+                        number,
+                        api_url,
                     )
                     print(f"PR comment {result}.")
                 else:
@@ -135,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
                 print("PR comment skipped: GitHub environment is incomplete.")
         except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
             print(f"::warning::PR comment skipped: {github_escape(str(exc))}")
-    return 1 if report.violations else 0
+    return 1 if report.violations and not args.advisory else 0
 
 
 if __name__ == "__main__":

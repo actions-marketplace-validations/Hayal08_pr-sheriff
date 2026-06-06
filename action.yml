@@ -23,6 +23,10 @@ inputs:
     description: Create or update a report comment on pull requests
     required: false
     default: "true"
+  mode:
+    description: Policy mode, either enforce or advisory
+    required: false
+    default: enforce
 
 outputs:
   risk:
@@ -40,6 +44,9 @@ outputs:
   tests-changed:
     description: Whether the pull request changes tests
     value: ${{ steps.check.outputs.tests-changed }}
+  policy-passed:
+    description: Whether the pull request satisfies every configured policy
+    value: ${{ steps.check.outputs.policy-passed }}
 
 runs:
   using: composite
@@ -51,11 +58,19 @@ runs:
         PR_SHERIFF_HEAD: ${{ inputs.head }}
         PR_SHERIFF_CONFIG: ${{ inputs.config }}
         PR_SHERIFF_COMMENT: ${{ inputs.comment }}
+        PR_SHERIFF_MODE: ${{ inputs.mode }}
         GITHUB_TOKEN: ${{ github.token }}
       run: |
         comment_args=()
         if [[ "$PR_SHERIFF_COMMENT" == "true" ]]; then
           comment_args+=(--github-comment)
+        fi
+        mode_args=()
+        if [[ "$PR_SHERIFF_MODE" == "advisory" ]]; then
+          mode_args+=(--advisory)
+        elif [[ "$PR_SHERIFF_MODE" != "enforce" ]]; then
+          echo "::error::mode must be either enforce or advisory"
+          exit 2
         fi
         PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m pr_sheriff check \
           --base "$PR_SHERIFF_BASE" \
@@ -64,4 +79,5 @@ runs:
           --github-summary "$GITHUB_STEP_SUMMARY" \
           --github-output "$GITHUB_OUTPUT" \
           --github-annotations \
-          "${comment_args[@]}"
+          "${comment_args[@]}" \
+          "${mode_args[@]}"

@@ -2,6 +2,14 @@
 
 All notable changes to PR Sheriff are documented here.
 
+## 0.4.0 - 2026-06-06
+
+- Add path-specific thresholds and test requirements.
+- Show an explainable risk score breakdown in every report.
+- Add advisory mode for gradual, non-blocking adoption.
+- Validate numeric thresholds and nested path rule configuration.
+- Expose `policy-passed` as a GitHub Action output.
+
 ## 0.3.1 - 2026-06-06
 
 - Publish PR Sheriff to the GitHub Actions Marketplace.

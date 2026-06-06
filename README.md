@@ -43,6 +43,12 @@ Policy check passed.
 The command exits with `1` when policy violations exist, making it suitable for
 CI and pre-push hooks. Use `--json` for integrations.
 
+Start with `--advisory` to report violations without blocking contributors:
+
+```bash
+pr-sheriff check --base origin/main --advisory
+```
+
 ## What it checks
 
 - Maximum changed lines and files
@@ -75,7 +81,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: Hayal08/pr-sheriff@v0.3.1
+      - uses: Hayal08/pr-sheriff@v0.4.0
         with:
           base: origin/${{ github.base_ref }}
 ```
@@ -92,9 +98,26 @@ comment, and fails when policy is violated.
 | `head` | `HEAD` | Head git ref for the three-dot diff |
 | `config` | `.pr-sheriff.json` | Path to repository policy |
 | `comment` | `true` | Create or update a report comment on pull requests |
+| `mode` | `enforce` | Use `advisory` to report without failing the check |
 
 The Action exposes `risk`, `score`, `changed-files`, `changed-lines`, and
-`tests-changed` outputs for later workflow steps.
+`tests-changed` outputs for later workflow steps. The `policy-passed` output is
+`false` when violations exist, including in advisory mode.
+
+### Gradual rollout
+
+Use advisory mode to learn what the policy would flag before making it a
+required check:
+
+```yaml
+- uses: Hayal08/pr-sheriff@v0.4.0
+  with:
+    base: origin/${{ github.base_ref }}
+    mode: advisory
+```
+
+Advisory mode keeps the Job Summary, PR comment, outputs, and annotations, but
+turns policy errors into warnings and returns a successful exit code.
 
 ## Configuration
 
@@ -107,12 +130,47 @@ Run `pr-sheriff init` or add `.pr-sheriff.json` manually:
   "require_tests_after_lines": 120,
   "test_patterns": ["tests/**", "**/*_test.*", "**/*.test.*"],
   "sensitive_patterns": [".github/workflows/**", "**/auth/**", "**/migrations/**"],
-  "ignore_patterns": ["**/*.md", "docs/**"]
+  "ignore_patterns": ["**/*.md", "docs/**"],
+  "path_rules": []
 }
 ```
 
 Unknown configuration keys are rejected so typos cannot silently weaken a
 policy.
+
+### Path-specific rules
+
+Different parts of a repository can have stricter review policies. Each matched
+rule is shown separately in the report:
+
+```json
+{
+  "path_rules": [
+    {
+      "name": "database migrations",
+      "patterns": ["**/migrations/**"],
+      "max_changed_lines": 100,
+      "require_tests_after_lines": 1
+    },
+    {
+      "name": "frontend",
+      "patterns": ["web/**"],
+      "max_changed_files": 15,
+      "require_tests_after_lines": 80
+    }
+  ]
+}
+```
+
+Path rules support `max_changed_lines`, `max_changed_files`, and
+`require_tests_after_lines`. Global limits still apply.
+
+### Explainable risk score
+
+Human-readable, JSON, Job Summary, and PR comment reports now show how changed
+lines, changed files, and sensitive paths contribute to the risk score. JSON
+consumers can use `score_breakdown` and `path_rule_results` for custom
+dashboards or workflow decisions.
 
 ## Try it safely
 

@@ -4,6 +4,7 @@ from io import StringIO
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from pr_sheriff.cli import (
     github_escape,
@@ -44,6 +45,7 @@ class CliTests(unittest.TestCase):
             output = path.read_text()
         self.assertIn("risk=low\n", output)
         self.assertIn("tests-changed=true\n", output)
+        self.assertIn("policy-passed=true\n", output)
 
     def test_annotations_escape_workflow_commands(self):
         report = Report("high", 80, 4, 900, False, ["a%b.py"], ["bad\nchange"])
@@ -52,6 +54,35 @@ class CliTests(unittest.TestCase):
             print_github_annotations(report)
         self.assertIn("file=a%25b.py", output.getvalue())
         self.assertIn("bad%0Achange", output.getvalue())
+
+    def test_advisory_mode_returns_success_for_violations(self):
+        report = Report("high", 80, 4, 900, False, [], ["too large"])
+        with patch("pr_sheriff.cli.git_changes", return_value=[]), patch(
+            "pr_sheriff.cli.analyze", return_value=report
+        ):
+            self.assertEqual(main(["check", "--base", "HEAD", "--advisory"]), 0)
+
+    def test_markdown_lists_matched_path_rules_and_breakdown(self):
+        report = Report(
+            "medium",
+            30,
+            2,
+            30,
+            True,
+            [],
+            [],
+            {
+                "changed_lines": 3,
+                "changed_files": 2,
+                "sensitive_files": 25,
+                "cap_adjustment": 0,
+                "total": 30,
+            },
+            [{"name": "api", "changed_files": 2, "changed_lines": 30, "violations": []}],
+        )
+        markdown = markdown_report(report)
+        self.assertIn("Risk score breakdown", markdown)
+        self.assertIn("**api**: 2 files, 30 lines (passed)", markdown)
 
 
 if __name__ == "__main__":
