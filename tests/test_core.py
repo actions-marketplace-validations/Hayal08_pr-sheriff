@@ -1,7 +1,17 @@
+import json
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
-from pr_sheriff.core import DEFAULT_CONFIG, FileChange, analyze, git_changes, parse_numstat
+from pr_sheriff.core import (
+    DEFAULT_CONFIG,
+    FileChange,
+    analyze,
+    git_changes,
+    load_config,
+    parse_numstat,
+)
 
 
 class ParseNumstatTests(unittest.TestCase):
@@ -42,6 +52,8 @@ class AnalyzeTests(unittest.TestCase):
         )
         self.assertEqual(report.risk, "medium")
         self.assertEqual(report.sensitive_files, [".github/workflows/release.yml"])
+        self.assertEqual(report.score_breakdown["sensitive_files"], 25)
+        self.assertEqual(report.score_breakdown["total"], report.score)
 
     def test_docs_are_ignored_from_size_budget(self):
         report = analyze([FileChange("docs/guide.md", 1000, 0)], DEFAULT_CONFIG)
@@ -52,6 +64,57 @@ class AnalyzeTests(unittest.TestCase):
         report = analyze([FileChange("README.md", 1000, 0)], DEFAULT_CONFIG)
         self.assertEqual(report.changed_lines, 0)
         self.assertEqual(report.violations, [])
+
+    def test_path_rule_applies_stricter_limit(self):
+        config = {
+            **DEFAULT_CONFIG,
+            "path_rules": [
+                {
+                    "name": "migrations",
+                    "patterns": ["**/migrations/**"],
+                    "max_changed_lines": 20,
+                    "require_tests_after_lines": 1,
+                }
+            ],
+        }
+        report = analyze([FileChange("app/migrations/001.sql", 30, 0)], config)
+        self.assertIn("[migrations] changed lines 30 exceed limit 20", report.violations)
+        self.assertIn("[migrations] tests required for changes of 1+ lines", report.violations)
+        self.assertEqual(report.path_rule_results[0]["name"], "migrations")
+
+    def test_score_breakdown_accounts_for_cap(self):
+        report = analyze([FileChange("src/large.py", 2000, 0)], DEFAULT_CONFIG)
+        breakdown = report.score_breakdown
+        self.assertEqual(sum(value for key, value in breakdown.items() if key != "total"), 100)
+        self.assertEqual(breakdown["total"], 100)
+
+
+class ConfigTests(unittest.TestCase):
+    def write_config(self, directory, config):
+        path = Path(directory) / "config.json"
+        path.write_text(json.dumps(config))
+        return path
+
+    def test_rejects_negative_numeric_threshold(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_config(directory, {"max_changed_lines": -1})
+            with self.assertRaisesRegex(ValueError, "max_changed_lines"):
+                load_config(path)
+
+    def test_rejects_boolean_numeric_threshold(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_config(directory, {"max_changed_files": True})
+            with self.assertRaisesRegex(ValueError, "max_changed_files"):
+                load_config(path)
+
+    def test_rejects_unknown_path_rule_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_config(
+                directory,
+                {"path_rules": [{"name": "api", "patterns": ["api/**"], "mystery": 1}]},
+            )
+            with self.assertRaisesRegex(ValueError, "unknown keys"):
+                load_config(path)
 
 
 if __name__ == "__main__":

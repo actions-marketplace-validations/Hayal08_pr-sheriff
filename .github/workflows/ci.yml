@@ -27,6 +27,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: ./
+      - id: sheriff
+        uses: ./
         with:
           base: HEAD^
+          comment: "false"
+          mode: advisory
+      - name: Verify Action outputs
+        env:
+          RISK: ${{ steps.sheriff.outputs.risk }}
+          POLICY_PASSED: ${{ steps.sheriff.outputs.policy-passed }}
+        run: |
+          test -n "$RISK"
+          test "$POLICY_PASSED" = "true" -o "$POLICY_PASSED" = "false"

@@ -4,5 +4,6 @@
   "require_tests_after_lines": 120,
   "test_patterns": ["tests/**", "test/**", "**/*_test.*", "**/*.test.*", "**/*.spec.*"],
   "sensitive_patterns": [".github/workflows/**", "**/auth/**", "**/security/**", "**/migrations/**", "Dockerfile", "**/Dockerfile", "package-lock.json", "poetry.lock"],
-  "ignore_patterns": ["**/*.md", "docs/**"]
+  "ignore_patterns": ["**/*.md", "docs/**"],
+  "path_rules": []
 }
