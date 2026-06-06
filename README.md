@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: Hayal08/pr-sheriff@v0.3.0
+      - uses: Hayal08/pr-sheriff@v0.3.1
         with:
           base: origin/${{ github.base_ref }}
 ```

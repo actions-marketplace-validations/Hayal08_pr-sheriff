@@ -2,6 +2,11 @@
 
 All notable changes to PR Sheriff are documented here.
 
+## 0.3.1 - 2026-06-06
+
+- Publish PR Sheriff to the GitHub Actions Marketplace.
+- Update the recommended pinned Action version.
+
 ## 0.3.0 - 2026-06-06
 
 - Create or update a single report comment on pull requests.
