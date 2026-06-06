@@ -53,7 +53,11 @@ class Report:
 
 
 def matches(path: str, patterns: Iterable[str]) -> bool:
-    return any(fnmatch(path, pattern) for pattern in patterns)
+    return any(
+        fnmatch(path, pattern)
+        or (pattern.startswith("**/") and fnmatch(path, pattern.removeprefix("**/")))
+        for pattern in patterns
+    )
 
 
 def parse_numstat(text: str) -> list[FileChange]:

@@ -1,6 +1,8 @@
 # PR Sheriff
 
 [![CI](https://github.com/Hayal08/pr-sheriff/actions/workflows/ci.yml/badge.svg)](https://github.com/Hayal08/pr-sheriff/actions/workflows/ci.yml)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-PR%20Sheriff-blue?logo=github)](https://github.com/marketplace/actions/pr-sheriff)
+[![Good first issues](https://img.shields.io/github/issues/Hayal08/pr-sheriff/good%20first%20issue)](https://github.com/Hayal08/pr-sheriff/labels/good%20first%20issue)
 
 PR Sheriff is a tiny, deterministic pull request risk checker for busy open-source
 maintainers. It catches oversized changes, missing tests, and edits to sensitive
@@ -8,6 +10,17 @@ files before review time is spent.
 
 It has no runtime dependencies, sends no code anywhere, and works in any Git
 repository.
+
+## Why PR Sheriff?
+
+Large or sensitive pull requests consume disproportionate review time. PR
+Sheriff gives contributors fast, predictable feedback before a maintainer starts
+reviewing:
+
+- contributors learn when a change needs tests or should be split;
+- maintainers see sensitive paths and review risk immediately;
+- teams keep policy in a small, version-controlled JSON file;
+- every decision remains deterministic and explainable.
 
 ## Quick start
 
@@ -118,3 +131,20 @@ consistent early warning so they can ask for smaller PRs, tests, or a deeper
 security review.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to help shape the project.
+
+## Contributing
+
+First-time contributors are welcome. Start with a
+[`good first issue`](https://github.com/Hayal08/pr-sheriff/labels/good%20first%20issue)
+or read [CONTRIBUTING.md](CONTRIBUTING.md) for the local development workflow.
+
+Useful ways to help:
+
+- try PR Sheriff in a real repository and report confusing behavior;
+- improve docs and policy examples;
+- add focused policy checks with tests;
+- share maintainer workflows that should influence the
+  [roadmap](ROADMAP.md).
+
+Please open an issue before starting a large change. Small pull requests are
+easier to review and are a good way to get involved.

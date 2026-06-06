@@ -48,6 +48,11 @@ class AnalyzeTests(unittest.TestCase):
         self.assertEqual(report.changed_lines, 0)
         self.assertEqual(report.violations, [])
 
+    def test_root_markdown_is_ignored_by_recursive_pattern(self):
+        report = analyze([FileChange("README.md", 1000, 0)], DEFAULT_CONFIG)
+        self.assertEqual(report.changed_lines, 0)
+        self.assertEqual(report.violations, [])
+
 
 if __name__ == "__main__":
     unittest.main()
