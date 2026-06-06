@@ -1,5 +1,7 @@
 # PR Sheriff
 
+[![CI](https://github.com/Hayal08/pr-sheriff/actions/workflows/ci.yml/badge.svg)](https://github.com/Hayal08/pr-sheriff/actions/workflows/ci.yml)
+
 PR Sheriff is a tiny, deterministic pull request risk checker for busy open-source
 maintainers. It catches oversized changes, missing tests, and edits to sensitive
 files before review time is spent.
@@ -39,15 +41,64 @@ CI and pre-push hooks. Use `--json` for integrations.
 Customize the generated `.pr-sheriff.json` to fit your repository. All matching
 uses portable glob patterns.
 
-## GitHub Actions
+## GitHub Action
+
+Add `.github/workflows/pr-sheriff.yml` to your repository:
 
 ```yaml
-- uses: actions/checkout@v4
-  with:
-    fetch-depth: 0
-- run: pip install .
-- run: pr-sheriff check --base origin/${{ github.base_ref }}
+name: PR Sheriff
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  review-risk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: Hayal08/pr-sheriff@main
+        with:
+          base: origin/${{ github.base_ref }}
 ```
+
+The Action adds a report to the GitHub Job Summary, emits annotations for
+sensitive files and policy violations, and fails when policy is violated.
+
+> Pin to a version tag instead of `main` once tagged releases are available.
+
+### Action inputs
+
+| Input | Default | Purpose |
+| --- | --- | --- |
+| `base` | `origin/main` | Base git ref for the three-dot diff |
+| `head` | `HEAD` | Head git ref for the three-dot diff |
+| `config` | `.pr-sheriff.json` | Path to repository policy |
+
+The Action exposes `risk`, `score`, `changed-files`, `changed-lines`, and
+`tests-changed` outputs for later workflow steps.
+
+## Configuration
+
+Run `pr-sheriff init` or add `.pr-sheriff.json` manually:
+
+```json
+{
+  "max_changed_lines": 800,
+  "max_changed_files": 30,
+  "require_tests_after_lines": 120,
+  "test_patterns": ["tests/**", "**/*_test.*", "**/*.test.*"],
+  "sensitive_patterns": [".github/workflows/**", "**/auth/**", "**/migrations/**"],
+  "ignore_patterns": ["**/*.md", "docs/**"]
+}
+```
+
+Unknown configuration keys are rejected so typos cannot silently weaken a
+policy.
 
 ## Philosophy
 

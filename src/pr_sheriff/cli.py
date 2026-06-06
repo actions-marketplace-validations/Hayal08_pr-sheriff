@@ -18,6 +18,9 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--head", default="HEAD", help="head git ref")
     check.add_argument("--config", default=".pr-sheriff.json", type=Path)
     check.add_argument("--json", action="store_true", dest="as_json")
+    check.add_argument("--github-summary", type=Path, help=argparse.SUPPRESS)
+    check.add_argument("--github-output", type=Path, help=argparse.SUPPRESS)
+    check.add_argument("--github-annotations", action="store_true", help=argparse.SUPPRESS)
     init = subparsers.add_parser("init", help="write a starter configuration")
     init.add_argument("--config", default=".pr-sheriff.json", type=Path)
     return parser
@@ -36,6 +39,51 @@ def print_report(report) -> None:
             print(f"  - {violation}")
     else:
         print("Policy check passed.")
+
+
+def markdown_report(report) -> str:
+    status = "Failed" if report.violations else "Passed"
+    tests = "yes" if report.tests_changed else "no"
+    lines = [
+        "## PR Sheriff report",
+        "",
+        f"**Policy: {status}** | **Risk: {report.risk.upper()} ({report.score}/100)**",
+        "",
+        "| Changed files | Changed lines | Tests changed |",
+        "| ---: | ---: | :---: |",
+        f"| {report.changed_files} | {report.changed_lines} | {tests} |",
+    ]
+    if report.sensitive_files:
+        lines.extend(["", "### Sensitive files"])
+        lines.extend(f"- `{path}`" for path in report.sensitive_files)
+    if report.violations:
+        lines.extend(["", "### Policy violations"])
+        lines.extend(f"- {violation}" for violation in report.violations)
+    return "\n".join(lines) + "\n"
+
+
+def github_escape(value: str) -> str:
+    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def write_github_output(path: Path, report) -> None:
+    values = {
+        "risk": report.risk,
+        "score": report.score,
+        "changed-files": report.changed_files,
+        "changed-lines": report.changed_lines,
+        "tests-changed": str(report.tests_changed).lower(),
+    }
+    with path.open("a", encoding="utf-8") as output:
+        for key, value in values.items():
+            output.write(f"{key}={value}\n")
+
+
+def print_github_annotations(report) -> None:
+    for path in report.sensitive_files:
+        print(f"::warning file={github_escape(path)}::Sensitive file changed")
+    for violation in report.violations:
+        print(f"::error::{github_escape(violation)}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -58,6 +106,13 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report.to_dict(), indent=2))
     else:
         print_report(report)
+    if args.github_summary:
+        with args.github_summary.open("a", encoding="utf-8") as summary:
+            summary.write(markdown_report(report))
+    if args.github_output:
+        write_github_output(args.github_output, report)
+    if args.github_annotations:
+        print_github_annotations(report)
     return 1 if report.violations else 0
 
 

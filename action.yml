@@ -1,0 +1,56 @@
+name: PR Sheriff
+description: Deterministic pull request risk checks for busy maintainers
+author: Hayal08
+
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  base:
+    description: Base git ref used for the three-dot diff
+    required: false
+    default: origin/main
+  head:
+    description: Head git ref used for the three-dot diff
+    required: false
+    default: HEAD
+  config:
+    description: Path to the PR Sheriff JSON configuration
+    required: false
+    default: .pr-sheriff.json
+
+outputs:
+  risk:
+    description: Calculated risk level (low, medium, or high)
+    value: ${{ steps.check.outputs.risk }}
+  score:
+    description: Calculated risk score from 0 to 100
+    value: ${{ steps.check.outputs.score }}
+  changed-files:
+    description: Number of relevant changed files
+    value: ${{ steps.check.outputs.changed-files }}
+  changed-lines:
+    description: Number of relevant changed lines
+    value: ${{ steps.check.outputs.changed-lines }}
+  tests-changed:
+    description: Whether the pull request changes tests
+    value: ${{ steps.check.outputs.tests-changed }}
+
+runs:
+  using: composite
+  steps:
+    - id: check
+      shell: bash
+      env:
+        PR_SHERIFF_BASE: ${{ inputs.base }}
+        PR_SHERIFF_HEAD: ${{ inputs.head }}
+        PR_SHERIFF_CONFIG: ${{ inputs.config }}
+      run: |
+        PYTHONPATH="$GITHUB_ACTION_PATH/src" python -m pr_sheriff check \
+          --base "$PR_SHERIFF_BASE" \
+          --head "$PR_SHERIFF_HEAD" \
+          --config "$PR_SHERIFF_CONFIG" \
+          --github-summary "$GITHUB_STEP_SUMMARY" \
+          --github-output "$GITHUB_OUTPUT" \
+          --github-annotations
