@@ -1,0 +1,8 @@
+{
+  "max_changed_lines": 800,
+  "max_changed_files": 30,
+  "require_tests_after_lines": 120,
+  "test_patterns": ["tests/**", "test/**", "**/*_test.*", "**/*.test.*", "**/*.spec.*"],
+  "sensitive_patterns": [".github/workflows/**", "**/auth/**", "**/security/**", "**/migrations/**", "Dockerfile", "**/Dockerfile", "package-lock.json", "poetry.lock"],
+  "ignore_patterns": ["**/*.md", "docs/**"]
+}
