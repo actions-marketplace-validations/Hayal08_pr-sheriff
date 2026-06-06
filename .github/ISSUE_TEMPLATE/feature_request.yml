@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest a focused improvement to PR Sheriff
+labels: ["enhancement"]
+body:
+  - type: textarea
+    attributes:
+      label: Maintainer problem
+      description: What review workflow is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed behavior
+      description: What should PR Sheriff report or do?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Example
+      description: Share example paths, configuration, or expected output.
+    validations:
+      required: true
+  - type: checkboxes
+    attributes:
+      label: Scope
+      options:
+        - label: This can remain deterministic and explainable.
+          required: true
+        - label: This does not require uploading repository code.
+          required: true

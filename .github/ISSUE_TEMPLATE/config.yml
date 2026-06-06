@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/Hayal08/pr-sheriff/security/advisories/new
+    about: Report vulnerabilities privately.
+  - name: Roadmap
+    url: https://github.com/Hayal08/pr-sheriff/blob/main/ROADMAP.md
+    about: Review planned work before proposing a large feature.
