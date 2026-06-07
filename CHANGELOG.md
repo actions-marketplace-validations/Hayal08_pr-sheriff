@@ -2,6 +2,12 @@
 
 All notable changes to PR Sheriff are documented here.
 
+## 0.6.0 - 2026-06-07
+
+- Add `pr-sheriff install-github --detect` for automatic policy selection.
+- Detect Python, JavaScript/TypeScript, mixed, and unknown repositories.
+- Explain the selected preset and the project markers used as evidence.
+
 ## 0.5.0 - 2026-06-07
 
 - Add ready-made Python and JavaScript/TypeScript policy presets.

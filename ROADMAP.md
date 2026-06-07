@@ -5,7 +5,7 @@ review. The roadmap is intentionally small and driven by maintainer feedback.
 
 ## Now: make adoption easy
 
-- Add ready-to-copy policy presets for Python, JavaScript, and Rust projects.
+- Add a ready-to-copy policy preset for Rust projects.
 - Improve error messages and configuration validation.
 - Add documentation examples for common repository layouts.
 - Collect feedback from the first repositories using the Action.
@@ -17,6 +17,7 @@ review. The roadmap is intentionally small and driven by maintainer feedback.
 
 Recently completed:
 
+- Automatically detect Python, JavaScript/TypeScript, and mixed repositories.
 - Support path-specific thresholds and policies.
 - Explain how each part of the risk score was calculated.
 - Add a non-blocking advisory mode for gradual adoption.

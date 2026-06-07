@@ -38,13 +38,19 @@ reviewing:
 
 ```bash
 python -m pip install pr-sheriff
-pr-sheriff install-github --preset python
+pr-sheriff install-github --detect
 ```
 
 Commit the two generated files and open a pull request. PR Sheriff starts in
-advisory mode, so it reports risks without blocking contributors. Use
-`--preset javascript` for JavaScript and TypeScript repositories, or add
-`--mode enforce` when the policy is ready to become required.
+advisory mode, so it reports risks without blocking contributors. Detection
+uses root project manifests and lockfiles, and falls back to the safe default
+policy when no known markers exist. Use `--preset python` or
+`--preset javascript` to choose explicitly, or add `--mode enforce` when the
+policy is ready to become required.
+
+For mixed Python and JavaScript repositories, detection combines both presets.
+Only root manifests and lockfiles are considered, so nested examples and
+vendored projects cannot silently change the selected policy.
 
 For local-only checks:
 
@@ -104,7 +110,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: Hayal08/pr-sheriff@v0.5.0
+      - uses: Hayal08/pr-sheriff@v0.6.0
         with:
           base: origin/${{ github.base_ref }}
 ```
@@ -133,7 +139,7 @@ Use advisory mode to learn what the policy would flag before making it a
 required check:
 
 ```yaml
-- uses: Hayal08/pr-sheriff@v0.5.0
+- uses: Hayal08/pr-sheriff@v0.6.0
   with:
     base: origin/${{ github.base_ref }}
     mode: advisory

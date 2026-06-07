@@ -75,3 +75,20 @@ PRESETS = {
 
 def get_preset(name: str) -> dict:
     return deepcopy(PRESETS[name])
+
+
+def merge_presets(*names: str) -> dict:
+    configs = [get_preset(name) for name in names]
+    merged = get_preset("default")
+    for key in ("max_changed_lines", "max_changed_files", "require_tests_after_lines"):
+        merged[key] = min(config[key] for config in configs)
+    for key in ("test_patterns", "sensitive_patterns", "ignore_patterns"):
+        merged[key] = list(
+            dict.fromkeys(item for config in configs for item in config[key])
+        )
+    rules = {}
+    for config in configs:
+        for rule in config["path_rules"]:
+            rules.setdefault(rule["name"], rule)
+    merged["path_rules"] = list(rules.values())
+    return merged

@@ -68,9 +68,35 @@ class CliTests(unittest.TestCase):
             )
             self.assertEqual(json.loads(config.read_text()), JAVASCRIPT_CONFIG)
             self.assertIn("mode: advisory", workflow.read_text())
-            self.assertIn("Hayal08/pr-sheriff@v0.5.0", workflow.read_text())
+            self.assertIn("Hayal08/pr-sheriff@v0.6.0", workflow.read_text())
             self.assertIn("origin/${{ github.base_ref }}", workflow.read_text())
             self.assertIn("actions/checkout@v6", workflow.read_text())
+
+    def test_install_github_detects_python_repository(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "pyproject.toml").write_text("[project]\n")
+            output = StringIO()
+            with redirect_stdout(output):
+                result = self.run_in(root, ["install-github", "--detect"])
+            self.assertEqual(result, 0)
+            self.assertEqual(json.loads((root / ".pr-sheriff.json").read_text()), PYTHON_CONFIG)
+            self.assertIn("Detected preset: python", output.getvalue())
+            self.assertIn("Evidence: pyproject.toml", output.getvalue())
+
+    def test_install_github_detect_falls_back_to_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = StringIO()
+            with redirect_stdout(output):
+                result = self.run_in(root, ["install-github", "--detect"])
+            self.assertEqual(result, 0)
+            self.assertEqual(json.loads((root / ".pr-sheriff.json").read_text()), DEFAULT_CONFIG)
+            self.assertIn("using the default policy", output.getvalue())
+
+    def test_install_github_rejects_detect_with_explicit_preset(self):
+        with self.assertRaises(SystemExit):
+            main(["install-github", "--detect", "--preset", "python"])
 
     def test_install_github_uses_custom_config_path_in_workflow(self):
         with tempfile.TemporaryDirectory() as directory:

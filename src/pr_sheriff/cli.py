@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 
 from .core import analyze, git_changes, load_config
+from .detect import detect_repository
 from .github import pull_request_number, upsert_pull_request_comment
 from .presets import PRESETS, get_preset
 
@@ -27,7 +28,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: Hayal08/pr-sheriff@v0.5.0
+      - uses: Hayal08/pr-sheriff@v0.6.0
         with:
           base: origin/${{{{ github.base_ref }}}}
           config: {config}
@@ -62,7 +63,11 @@ def build_parser() -> argparse.ArgumentParser:
     install.add_argument(
         "--workflow", default=".github/workflows/pr-sheriff.yml", type=Path
     )
-    install.add_argument("--preset", choices=PRESETS, default="default")
+    install_policy = install.add_mutually_exclusive_group()
+    install_policy.add_argument("--preset", choices=PRESETS, default="default")
+    install_policy.add_argument(
+        "--detect", action="store_true", help="detect a policy preset from repository files"
+    )
     install.add_argument("--mode", choices=("advisory", "enforce"), default="advisory")
     install.add_argument("--force", action="store_true")
     return parser
@@ -239,7 +244,17 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{path} already exists", file=sys.stderr)
             print("Use --force to overwrite existing files.", file=sys.stderr)
             return 2
-        config = json.dumps(get_preset(args.preset), indent=2) + "\n"
+        if args.detect:
+            detection = detect_repository(Path.cwd())
+            preset = detection.config
+            print(f"Detected preset: {detection.preset}")
+            if detection.evidence:
+                print(f"Evidence: {', '.join(detection.evidence)}")
+            else:
+                print("Evidence: no known project markers; using the default policy")
+        else:
+            preset = get_preset(args.preset)
+        config = json.dumps(preset, indent=2) + "\n"
         try:
             install_files(
                 [
