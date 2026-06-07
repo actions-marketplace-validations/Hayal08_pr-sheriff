@@ -6,8 +6,33 @@ import os
 from pathlib import Path
 import sys
 
-from .core import DEFAULT_CONFIG, analyze, git_changes, load_config
+from .core import analyze, git_changes, load_config
 from .github import pull_request_number, upsert_pull_request_comment
+from .presets import PRESETS, get_preset
+
+
+WORKFLOW_TEMPLATE = """name: PR Sheriff
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review-risk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: Hayal08/pr-sheriff@v0.5.0
+        with:
+          base: origin/${{{{ github.base_ref }}}}
+          config: {config}
+          mode: {mode}
+"""
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,7 +54,67 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--github-comment", action="store_true", help=argparse.SUPPRESS)
     init = subparsers.add_parser("init", help="write a starter configuration")
     init.add_argument("--config", default=".pr-sheriff.json", type=Path)
+    init.add_argument("--preset", choices=PRESETS, default="default")
+    install = subparsers.add_parser(
+        "install-github", help="install configuration and a GitHub Actions workflow"
+    )
+    install.add_argument("--config", default=".pr-sheriff.json", type=Path)
+    install.add_argument(
+        "--workflow", default=".github/workflows/pr-sheriff.yml", type=Path
+    )
+    install.add_argument("--preset", choices=PRESETS, default="default")
+    install.add_argument("--mode", choices=("advisory", "enforce"), default="advisory")
+    install.add_argument("--force", action="store_true")
     return parser
+
+
+def write_file(path: Path, content: str, force: bool = False) -> bool:
+    if path.exists() and not force:
+        print(f"{path} already exists", file=sys.stderr)
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    print(f"Wrote {path}")
+    return True
+
+
+def install_files(files: list[tuple[Path, str]]) -> None:
+    originals: dict[Path, bytes | None] = {}
+    written = []
+    try:
+        for path, content in files:
+            if path.exists() and not path.is_file():
+                raise OSError(f"{path} exists and is not a file")
+            originals[path] = path.read_bytes() if path.exists() else None
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+            written.append(path)
+    except OSError:
+        for path in reversed(written):
+            original = originals[path]
+            if original is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(original)
+        raise
+    for path, _ in files:
+        print(f"Wrote {path}")
+
+
+def repository_path(path: Path, label: str) -> Path:
+    root = Path.cwd().resolve()
+    resolved = path.resolve() if path.is_absolute() else (root / path).resolve()
+    try:
+        relative = resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"{label} must be a path inside the repository") from exc
+    if not relative.parts:
+        raise ValueError(f"{label} must point to a file")
+    return relative
+
+
+def render_workflow(mode: str, config: Path) -> str:
+    return WORKFLOW_TEMPLATE.format(mode=mode, config=json.dumps(config.as_posix()))
 
 
 def print_report(report) -> None:
@@ -100,8 +185,11 @@ def markdown_report(report, advisory: bool = False) -> str:
     return "\n".join(lines) + "\n"
 
 
-def github_escape(value: str) -> str:
-    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+def github_escape(value: str, property_value: bool = False) -> str:
+    escaped = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    if property_value:
+        escaped = escaped.replace(":", "%3A").replace(",", "%2C")
+    return escaped
 
 
 def write_github_output(path: Path, report) -> None:
@@ -120,7 +208,8 @@ def write_github_output(path: Path, report) -> None:
 
 def print_github_annotations(report, advisory: bool = False) -> None:
     for path in report.sensitive_files:
-        print(f"::warning file={github_escape(path)}::Sensitive file changed")
+        escaped_path = github_escape(path, property_value=True)
+        print(f"::warning file={escaped_path}::Sensitive file changed")
     for violation in report.violations:
         level = "warning" if advisory else "error"
         print(f"::{level}::{github_escape(violation)}")
@@ -129,11 +218,39 @@ def print_github_annotations(report, advisory: bool = False) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "init":
-        if args.config.exists():
-            print(f"{args.config} already exists", file=sys.stderr)
+        content = json.dumps(get_preset(args.preset), indent=2) + "\n"
+        try:
+            return 0 if write_file(args.config, content) else 2
+        except OSError as exc:
+            print(f"pr-sheriff: could not write configuration: {exc}", file=sys.stderr)
             return 2
-        args.config.write_text(json.dumps(DEFAULT_CONFIG, indent=2) + "\n", encoding="utf-8")
-        print(f"Wrote {args.config}")
+    if args.command == "install-github":
+        try:
+            config_path = repository_path(args.config, "config")
+            workflow_path = repository_path(args.workflow, "workflow")
+            if config_path == workflow_path:
+                raise ValueError("config and workflow must point to different files")
+        except (OSError, ValueError) as exc:
+            print(f"pr-sheriff: {exc}", file=sys.stderr)
+            return 2
+        existing = [path for path in (config_path, workflow_path) if path.exists()]
+        if existing and not args.force:
+            for path in existing:
+                print(f"{path} already exists", file=sys.stderr)
+            print("Use --force to overwrite existing files.", file=sys.stderr)
+            return 2
+        config = json.dumps(get_preset(args.preset), indent=2) + "\n"
+        try:
+            install_files(
+                [
+                    (config_path, config),
+                    (workflow_path, render_workflow(args.mode, config_path)),
+                ]
+            )
+        except OSError as exc:
+            print(f"pr-sheriff: could not install GitHub workflow: {exc}", file=sys.stderr)
+            return 2
+        print("PR Sheriff is installed. Open a pull request to see the first report.")
         return 0
 
     try:
