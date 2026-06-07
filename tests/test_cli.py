@@ -14,6 +14,7 @@ from pr_sheriff.cli import (
 )
 from pr_sheriff.cli import main
 from pr_sheriff.core import DEFAULT_CONFIG, Report, load_config
+from pr_sheriff.presets import JAVASCRIPT_CONFIG, PYTHON_CONFIG
 
 
 class CliTests(unittest.TestCase):
@@ -22,6 +23,84 @@ class CliTests(unittest.TestCase):
             path = Path(directory) / "config.json"
             self.assertEqual(main(["init", "--config", str(path)]), 0)
             self.assertEqual(json.loads(path.read_text()), DEFAULT_CONFIG)
+
+    def test_init_writes_selected_preset(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.json"
+            self.assertEqual(
+                main(["init", "--config", str(path), "--preset", "python"]), 0
+            )
+            self.assertEqual(json.loads(path.read_text()), PYTHON_CONFIG)
+
+    def test_install_github_writes_config_and_advisory_workflow(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / ".pr-sheriff.json"
+            workflow = root / ".github/workflows/pr-sheriff.yml"
+            self.assertEqual(
+                main(
+                    [
+                        "install-github",
+                        "--config",
+                        str(config),
+                        "--workflow",
+                        str(workflow),
+                        "--preset",
+                        "javascript",
+                    ]
+                ),
+                0,
+            )
+            self.assertEqual(json.loads(config.read_text()), JAVASCRIPT_CONFIG)
+            self.assertIn("mode: advisory", workflow.read_text())
+            self.assertIn("Hayal08/pr-sheriff@v0.5.0", workflow.read_text())
+            self.assertIn("origin/${{ github.base_ref }}", workflow.read_text())
+
+    def test_install_github_does_not_partially_overwrite_without_force(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / ".pr-sheriff.json"
+            workflow = root / ".github/workflows/pr-sheriff.yml"
+            config.write_text("keep me")
+            self.assertEqual(
+                main(
+                    [
+                        "install-github",
+                        "--config",
+                        str(config),
+                        "--workflow",
+                        str(workflow),
+                    ]
+                ),
+                2,
+            )
+            self.assertEqual(config.read_text(), "keep me")
+            self.assertFalse(workflow.exists())
+
+    def test_install_github_force_overwrites_existing_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / ".pr-sheriff.json"
+            workflow = root / "pr-sheriff.yml"
+            config.write_text("old")
+            workflow.write_text("old")
+            self.assertEqual(
+                main(
+                    [
+                        "install-github",
+                        "--config",
+                        str(config),
+                        "--workflow",
+                        str(workflow),
+                        "--mode",
+                        "enforce",
+                        "--force",
+                    ]
+                ),
+                0,
+            )
+            self.assertEqual(json.loads(config.read_text()), DEFAULT_CONFIG)
+            self.assertIn("mode: enforce", workflow.read_text())
 
     def test_unknown_config_key_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

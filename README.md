@@ -3,6 +3,7 @@
 [![CI](https://github.com/Hayal08/pr-sheriff/actions/workflows/ci.yml/badge.svg)](https://github.com/Hayal08/pr-sheriff/actions/workflows/ci.yml)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-PR%20Sheriff-blue?logo=github)](https://github.com/marketplace/actions/pr-sheriff)
 [![Good first issues](https://img.shields.io/github/issues/Hayal08/pr-sheriff/good%20first%20issue)](https://github.com/Hayal08/pr-sheriff/labels/good%20first%20issue)
+[![PyPI](https://img.shields.io/pypi/v/pr-sheriff)](https://pypi.org/project/pr-sheriff/)
 
 PR Sheriff is a tiny, deterministic pull request risk checker for busy open-source
 maintainers. It catches oversized changes, missing tests, and edits to sensitive
@@ -36,8 +37,19 @@ reviewing:
 ## Quick start
 
 ```bash
-python -m pip install .
-pr-sheriff init
+python -m pip install pr-sheriff
+pr-sheriff install-github --preset python
+```
+
+Commit the two generated files and open a pull request. PR Sheriff starts in
+advisory mode, so it reports risks without blocking contributors. Use
+`--preset javascript` for JavaScript and TypeScript repositories, or add
+`--mode enforce` when the policy is ready to become required.
+
+For local-only checks:
+
+```bash
+pr-sheriff init --preset python
 pr-sheriff check --base origin/main
 ```
 
@@ -92,7 +104,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: Hayal08/pr-sheriff@v0.4.0
+      - uses: Hayal08/pr-sheriff@v0.5.0
         with:
           base: origin/${{ github.base_ref }}
 ```
@@ -121,7 +133,7 @@ Use advisory mode to learn what the policy would flag before making it a
 required check:
 
 ```yaml
-- uses: Hayal08/pr-sheriff@v0.4.0
+- uses: Hayal08/pr-sheriff@v0.5.0
   with:
     base: origin/${{ github.base_ref }}
     mode: advisory
@@ -132,7 +144,16 @@ turns policy errors into warnings and returns a successful exit code.
 
 ## Configuration
 
-Run `pr-sheriff init` or add `.pr-sheriff.json` manually:
+Run `pr-sheriff init`, choose a ready-made `python` or `javascript` preset, or
+add `.pr-sheriff.json` manually:
+
+```bash
+pr-sheriff init --preset python
+```
+
+The presets recognize ecosystem-specific test files, manifests, lockfiles, and
+database migrations. Generated policies remain ordinary JSON and can be
+customized at any time.
 
 ```json
 {

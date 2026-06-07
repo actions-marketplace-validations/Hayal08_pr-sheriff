@@ -6,8 +6,32 @@ import os
 from pathlib import Path
 import sys
 
-from .core import DEFAULT_CONFIG, analyze, git_changes, load_config
+from .core import analyze, git_changes, load_config
 from .github import pull_request_number, upsert_pull_request_comment
+from .presets import PRESETS, get_preset
+
+
+WORKFLOW_TEMPLATE = """name: PR Sheriff
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review-risk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: Hayal08/pr-sheriff@v0.5.0
+        with:
+          base: origin/${{{{ github.base_ref }}}}
+          mode: {mode}
+"""
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,7 +53,28 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--github-comment", action="store_true", help=argparse.SUPPRESS)
     init = subparsers.add_parser("init", help="write a starter configuration")
     init.add_argument("--config", default=".pr-sheriff.json", type=Path)
+    init.add_argument("--preset", choices=PRESETS, default="default")
+    install = subparsers.add_parser(
+        "install-github", help="install configuration and a GitHub Actions workflow"
+    )
+    install.add_argument("--config", default=".pr-sheriff.json", type=Path)
+    install.add_argument(
+        "--workflow", default=".github/workflows/pr-sheriff.yml", type=Path
+    )
+    install.add_argument("--preset", choices=PRESETS, default="default")
+    install.add_argument("--mode", choices=("advisory", "enforce"), default="advisory")
+    install.add_argument("--force", action="store_true")
     return parser
+
+
+def write_file(path: Path, content: str, force: bool = False) -> bool:
+    if path.exists() and not force:
+        print(f"{path} already exists", file=sys.stderr)
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    print(f"Wrote {path}")
+    return True
 
 
 def print_report(report) -> None:
@@ -129,11 +174,19 @@ def print_github_annotations(report, advisory: bool = False) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "init":
-        if args.config.exists():
-            print(f"{args.config} already exists", file=sys.stderr)
+        content = json.dumps(get_preset(args.preset), indent=2) + "\n"
+        return 0 if write_file(args.config, content) else 2
+    if args.command == "install-github":
+        existing = [path for path in (args.config, args.workflow) if path.exists()]
+        if existing and not args.force:
+            for path in existing:
+                print(f"{path} already exists", file=sys.stderr)
+            print("Use --force to overwrite existing files.", file=sys.stderr)
             return 2
-        args.config.write_text(json.dumps(DEFAULT_CONFIG, indent=2) + "\n", encoding="utf-8")
-        print(f"Wrote {args.config}")
+        config = json.dumps(get_preset(args.preset), indent=2) + "\n"
+        write_file(args.config, config, args.force)
+        write_file(args.workflow, WORKFLOW_TEMPLATE.format(mode=args.mode), args.force)
+        print("PR Sheriff is installed. Open a pull request to see the first report.")
         return 0
 
     try:
