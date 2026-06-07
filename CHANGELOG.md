@@ -9,6 +9,7 @@ All notable changes to PR Sheriff are documented here.
 - Default generated workflows to advisory mode for a gradual rollout.
 - Add a manual trusted-publishing workflow for PyPI.
 - Validate installer paths, custom config wiring, annotations, and package builds.
+- Generate Node.js 24-compatible GitHub Actions workflows.
 
 ## 0.4.0 - 2026-06-06
 

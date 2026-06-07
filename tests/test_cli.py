@@ -70,6 +70,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("mode: advisory", workflow.read_text())
             self.assertIn("Hayal08/pr-sheriff@v0.5.0", workflow.read_text())
             self.assertIn("origin/${{ github.base_ref }}", workflow.read_text())
+            self.assertIn("actions/checkout@v6", workflow.read_text())
 
     def test_install_github_uses_custom_config_path_in_workflow(self):
         with tempfile.TemporaryDirectory() as directory:

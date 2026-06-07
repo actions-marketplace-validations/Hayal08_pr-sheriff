@@ -24,7 +24,7 @@ jobs:
   review-risk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - uses: Hayal08/pr-sheriff@v0.5.0
